@@ -1,0 +1,38 @@
+schema: spec-driven
+
+# Project context: constraints an agent cannot infer from the code.
+context: |
+  Asterisk is a personal sports-prediction engine for Kalshi event contracts.
+  It encodes the rulebook built and tested by hand during the 2026 World Cup
+  (see docs/rules-catalog.md) and adds math, data ingestion and a ledger.
+
+  Core principles (non-negotiable):
+  - The market price is the prior. The system adjusts it; it never invents
+    probabilities from scratch or from an LLM.
+  - LLMs read news and argue against picks. They never output a probability.
+  - Every rule is a bounded, logged, weighted adjustment that must keep earning
+    its weight in the ledger. Rules that do not help get weight 0.
+  - "No bet" is a first-class, expected output.
+  - Read-only toward Kalshi until the ledger shows positive closing-line value
+    over at least 100 settled picks. Order placement is out of scope for now.
+  - All money limits (per-bet cap, per-day cap, Kelly fraction) live in config,
+    never in code and never chosen at runtime by a model.
+
+  Domain notes:
+  - First league: Liga MX (Apertura/Clausura, Liguilla knockouts).
+    Knockout markets can resolve on "90 minutes" vs "extra time/penalties";
+    stoppage time counts as 90 minutes.
+  - Times are stored in UTC; display in America/Mexico_City and America/Chicago.
+  - Source text is often Spanish; extraction must handle Spanish and English.
+
+  Stack (proposed, see design.md): Python 3.12, uv, pytest, SQLite/DuckDB,
+  Anthropic API for extraction and review.
+
+rules:
+  proposal:
+    - State what is out of scope.
+  specs:
+    - Use SHALL/MUST. One behavior per requirement. Every requirement has a scenario.
+    - Express probabilities as decimals in [0,1] and prices in cents (1-99).
+  tasks:
+    - Every task that adds math includes a unit test with a worked numeric example.
