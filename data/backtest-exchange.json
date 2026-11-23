@@ -1,0 +1,57 @@
+{
+  "source": "ESPN, OpenFootball, Kalshi historical market candlesticks",
+  "type": "Retrospective market-covered sample",
+  "method": "All matched three-way regulation markets with strictly pre-kickoff, non-extreme hour-close asks by two hours before kickoff. Daily refits. Multiclass Brier sum and natural-log loss. Fixed 70% normalized market weight, zero unobserved rule adjustments. No fees, fill assumptions or realized returns.",
+  "results": [
+    {
+      "tournament": "Apertura 2025",
+      "regulationResults": 169,
+      "listedEvents": 26,
+      "exclusions": {
+        "unlinked": 5,
+        "unrated": 0,
+        "missingQuote": 0
+      },
+      "market": {
+        "samples": 21,
+        "logLoss": 1.0045045187149058,
+        "brier": 0.6008037994831422
+      },
+      "model": {
+        "samples": 21,
+        "logLoss": 1.048696076060371,
+        "brier": 0.6309712635109295
+      },
+      "combined": {
+        "samples": 21,
+        "logLoss": 1.0155513332955304,
+        "brier": 0.6084570473630658
+      }
+    },
+    {
+      "tournament": "Clausura 2026",
+      "regulationResults": 167,
+      "listedEvents": 168,
+      "exclusions": {
+        "unlinked": 1,
+        "unrated": 0,
+        "missingQuote": 0
+      },
+      "market": {
+        "samples": 167,
+        "logLoss": 1.0194483225624356,
+        "brier": 0.6122198639202378
+      },
+      "model": {
+        "samples": 167,
+        "logLoss": 1.0358368858247935,
+        "brier": 0.6210912115557533
+      },
+      "combined": {
+        "samples": 167,
+        "logLoss": 1.021182839389054,
+        "brier": 0.6127040387368629
+      }
+    }
+  ]
+}

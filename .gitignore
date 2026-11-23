@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.asterisk/
+.env
+.env.*
+!.env.example
+coverage/
+reports/
+*.log
+.asterisk-eval-cache/

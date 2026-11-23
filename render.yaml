@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: asterisk-analyst
+    runtime: node
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.1
+      - key: ASTERISK_USERS
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: asterisk-ledger
+          property: connectionString
+  - type: cron
+    name: asterisk-matchday
+    runtime: node
+    schedule: "15 14 * * *"
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run daily
+    envVars:
+      - key: NODE_VERSION
+        value: 24.14.1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: asterisk-ledger
+          property: connectionString
+databases:
+  - name: asterisk-ledger
+    databaseName: asterisk
+    user: asterisk
+    ipAllowList: []

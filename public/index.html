@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f4ed"><title>Asterisk · Liga MX analyst</title><link rel="stylesheet" href="/desk.css"><script defer src="/desk.js"></script></head>
+<body><header><div class="wordmark"><span aria-hidden="true">✳</span> Asterisk</div><span class="product">Football research</span><span class="readonly">Read-only</span></header>
+<main><form id="login" hidden><label for="token">Analyst access token</label><input id="token" type="password" autocomplete="off" required><button>Open analysis</button></form><p id="notice" role="status">Loading match analysis…</p>
+<div id="desk" hidden><section class="hero"><div><p class="over" id="edition"></p><h1 id="headline">Liga MX</h1><p class="sub" id="when"></p></div><div class="index"><span>Paper exposure</span><strong id="exposure"></strong><small id="cap"></small></div></section>
+<div class="columns"><section class="maincol"><div class="section-heading"><h2>Match card</h2><button id="download" class="quiet" type="button">Download card ↓</button></div><p id="empty" hidden></p><div id="markets"></div>
+<details id="scorepanel"><summary>Settlement &amp; performance</summary><div id="performance"></div></details>
+<details><summary>Sources &amp; model</summary><div id="sources"></div></details></section>
+<aside><p class="over">Asterisk analyst</p><h2>Ask about the card</h2><div class="prompts"><button type="button">Explain the probabilities</button><button type="button">How did the model perform?</button><button type="button">Show run status</button></div><form id="ask"><label for="question">Your question</label><textarea id="question" maxlength="1800" rows="3" required placeholder="Why was there no paper pick?"></textarea><button id="submit">Ask analyst ↗</button></form><div id="answer" aria-live="polite"></div></aside></div>
+<footer><span>Asterisk · Liga MX</span><span>Paper analysis only. This is not financial advice.</span></footer></div></main></body></html>
