@@ -1,0 +1,26 @@
+[
+  {
+    "closingAsk": 0.58,
+    "outcome": 1,
+    "ticker": "KXLIGAMXGAME-26NOV07TOLMON-TOL",
+    "source": "https://api.elections.kalshi.com/trade-api/v2/markets/KXLIGAMXGAME-26NOV07TOLMON-TOL",
+    "closeSource": "https://api.elections.kalshi.com/trade-api/v2/series/KXLIGAMXGAME/markets/KXLIGAMXGAME-26NOV07TOLMON-TOL/candlesticks?start_ts=1794098940&end_ts=1794099540&period_interval=1",
+    "settledAt": "2026-11-08T03:09:22.099894Z"
+  },
+  {
+    "closingAsk": 0.22,
+    "outcome": 0,
+    "ticker": "KXLIGAMXGAME-26NOV07TOLMON-MON",
+    "source": "https://api.elections.kalshi.com/trade-api/v2/markets/KXLIGAMXGAME-26NOV07TOLMON-MON",
+    "closeSource": "https://api.elections.kalshi.com/trade-api/v2/series/KXLIGAMXGAME/markets/KXLIGAMXGAME-26NOV07TOLMON-MON/candlesticks?start_ts=1794098940&end_ts=1794099540&period_interval=1",
+    "settledAt": "2026-11-08T03:09:22.099894Z"
+  },
+  {
+    "closingAsk": 0.22,
+    "outcome": 0,
+    "ticker": "KXLIGAMXGAME-26NOV07TOLMON-TIE",
+    "source": "https://api.elections.kalshi.com/trade-api/v2/markets/KXLIGAMXGAME-26NOV07TOLMON-TIE",
+    "closeSource": "https://api.elections.kalshi.com/trade-api/v2/series/KXLIGAMXGAME/markets/KXLIGAMXGAME-26NOV07TOLMON-TIE/candlesticks?start_ts=1794098940&end_ts=1794099540&period_interval=1",
+    "settledAt": "2026-11-08T03:09:22.099894Z"
+  }
+]

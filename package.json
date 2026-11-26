@@ -1,0 +1,36 @@
+{
+  "name": "asterisk-analyst",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "eval": "vitest run test/agent.test.ts",
+    "start": "node dist/main.js serve",
+    "demo": "node dist/main.js demo",
+    "daily": "node dist/main.js daily",
+    "bundle": "node scripts/bundle.mjs",
+    "migrate": "node dist/main.js migrate",
+    "consult": "node dist/main.js consult",
+    "backtest": "node dist/backtest.js"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "fastify": "^5.6.0",
+    "pg": "^8.16.0",
+    "saxes": "6.0.0",
+    "tldts": "^7.5.5",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

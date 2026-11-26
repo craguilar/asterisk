@@ -1,0 +1,40 @@
+{
+  "source": "OpenFootball CC0",
+  "coverage": "All regulation results, including knockout rounds. No exchange prices in the results archive.",
+  "results": [
+    {
+      "tournament": "Apertura 2024–25",
+      "scheduled": 170,
+      "completed": 170,
+      "leagueFrequencyBaseline": {
+        "samples": 170,
+        "logLoss": 1.0526189250528064,
+        "brier": 0.6343395741189104
+      },
+      "dixonColes": {
+        "samples": 170,
+        "logLoss": 1.0004593185285375,
+        "brier": 0.5949621487370494
+      },
+      "market": null,
+      "combined": null
+    },
+    {
+      "tournament": "Clausura 2024–25",
+      "scheduled": 170,
+      "completed": 170,
+      "leagueFrequencyBaseline": {
+        "samples": 170,
+        "logLoss": 1.0506288156633619,
+        "brier": 0.6332345010285685
+      },
+      "dixonColes": {
+        "samples": 170,
+        "logLoss": 0.9718652249781021,
+        "brier": 0.5778027748970523
+      },
+      "market": null,
+      "combined": null
+    }
+  ]
+}

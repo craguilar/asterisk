@@ -25,11 +25,11 @@ The repository is empty. The only prior art is a hand-run process from the 2026 
 
 ## Decisions
 
-### D1. Language and tooling: Python 3.12 with uv and pytest
-The modeling stack (numpy, scipy, pandas, scikit-learn, statsmodels) is far stronger in Python. Alternative considered: .NET to match the day-job stack. Rejected for the core because Dixon-Coles fitting and L1 logistic regression are one-liners in Python. A .NET client can consume the JSON card later.
+### D1. TypeScript on Node
+The implementation follows the TypeScript plan in PR #1 with strict type checking, Fastify and Vitest.
 
-### D2. Storage: SQLite for the ledger, DuckDB or Parquet for analytics
-SQLite gives a single-file, append-only ledger. DuckDB reads it for reports. Alternative: Postgres. Rejected until there is more than one user or process.
+### D2. Shared PostgreSQL
+The web service and scheduled job share PostgreSQL. The single-process local demo embeds PostgreSQL through PGlite and uses the same SQL migration.
 
 ### D3. Pipeline stages
 ```

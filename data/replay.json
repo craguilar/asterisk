@@ -1,0 +1,43 @@
+{
+  "markets": [
+    {
+      "label": "Toluca",
+      "ticker": "KXLIGAMXGAME-26NOV07TOLMON-TOL",
+      "bid": 0.57,
+      "asOf": "2026-11-07T16:00:00.000Z",
+      "volume": 273.76,
+      "source": "https://api.elections.kalshi.com/trade-api/v2/series/KXLIGAMXGAME/markets/KXLIGAMXGAME-26NOV07TOLMON-TOL/candlesticks?start_ts=1794060000&end_ts=1794067200&period_interval=60",
+      "rules": "If Toluca wins the Toluca vs Monterrey professional Liga MX soccer game originally scheduled for Nov 7, 2026 after 90 minutes plus stoppage time (does not include extra time or penalties), then the market resolves to Yes.",
+      "ask": 0.58
+    },
+    {
+      "label": "Monterrey",
+      "ticker": "KXLIGAMXGAME-26NOV07TOLMON-MON",
+      "bid": 0.21,
+      "asOf": "2026-11-07T16:00:00.000Z",
+      "volume": 502.08,
+      "source": "https://api.elections.kalshi.com/trade-api/v2/series/KXLIGAMXGAME/markets/KXLIGAMXGAME-26NOV07TOLMON-MON/candlesticks?start_ts=1794060000&end_ts=1794067200&period_interval=60",
+      "rules": "If Monterrey wins the Toluca vs Monterrey professional Liga MX soccer game originally scheduled for Nov 7, 2026 after 90 minutes plus stoppage time (does not include extra time or penalties), then the market resolves to Yes.",
+      "ask": 0.22
+    },
+    {
+      "label": "Tie",
+      "ticker": "KXLIGAMXGAME-26NOV07TOLMON-TIE",
+      "bid": 0.21,
+      "asOf": "2026-11-07T16:00:00.000Z",
+      "volume": 86.2,
+      "source": "https://api.elections.kalshi.com/trade-api/v2/series/KXLIGAMXGAME/markets/KXLIGAMXGAME-26NOV07TOLMON-TIE/candlesticks?start_ts=1794060000&end_ts=1794067200&period_interval=60",
+      "rules": "If Tie is the result of the Toluca vs Monterrey professional Liga MX soccer game originally scheduled for Nov 7, 2026 after 90 minutes plus stoppage time (does not include extra time or penalties), then the market resolves to Yes.",
+      "ask": 0.22
+    }
+  ],
+  "source": "https://kalshi.com/markets/kxligamxgame/liga-mx-game/kxligamxgame-26nov07tolmon",
+  "eventTicker": "KXLIGAMXGAME-26NOV07TOLMON",
+  "asOf": "2026-11-07T16:00:00.000Z",
+  "match": {
+    "source": "https://www.espn.com/soccer/match/_/gameId/401876905",
+    "away": "Monterrey",
+    "home": "Toluca",
+    "kickoff": "2026-11-08T01:00:00.000Z"
+  }
+}

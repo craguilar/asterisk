@@ -1,0 +1,7 @@
+.git
+.asterisk
+node_modules
+dist
+reports
+.env*
+*.log

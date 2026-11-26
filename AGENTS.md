@@ -19,18 +19,19 @@ Before writing code, read the active change and its specs. Implement tasks in or
 
 ## Hard constraints
 
-1. Never call a Kalshi order endpoint. Trading is disabled until the ledger's trading gate passes.
+1. Never call a Kalshi order endpoint. Trading is disabled regardless of whether the ledger's trading gate passes.
 2. Never let an LLM output a probability, score prediction or stake.
 3. Money limits come only from config.
 4. Every rule adjustment is capped (0.4 per rule, 0.8 total, log-odds) and logged.
 5. Tests run offline against recorded fixtures; no live API calls in the test suite.
 6. Every math function gets a unit test with the worked example from its spec.
 
-## Commands (once the skeleton exists)
+## Commands
 
 ```bash
-uv sync
-uv run pytest
-uv run asterisk daily --league liga-mx --date 2026-11-22
+npm ci
+npm test
+npm run build
+npm run daily
 openspec validate --strict
 ```

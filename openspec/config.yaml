@@ -25,7 +25,7 @@ context: |
   - Times are stored in UTC; display in America/Mexico_City and America/Chicago.
   - Source text is often Spanish; extraction must handle Spanish and English.
 
-  Stack (proposed, see design.md): Python 3.12, uv, pytest, SQLite/DuckDB,
+  Implementation stack (TypeScript plan): Node.js, TypeScript, Fastify, Vitest, PostgreSQL,
   Anthropic API for extraction and review.
 
 rules:

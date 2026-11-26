@@ -1,0 +1,106 @@
+{
+  "version": "dc1-cbe6d31f92caf8d6",
+  "asOf": "2026-11-07T16:00:00.000Z",
+  "samples": 1321,
+  "trainedThrough": "2026-11-03T01:10:00.000Z",
+  "teams": {
+    "América": {
+      "attack": 0.2557240971979405,
+      "defense": -0.23471708805422042,
+      "matches": 167
+    },
+    "Atlante": {
+      "attack": -0.2002481428660094,
+      "defense": 0.09448045530772216,
+      "matches": 15
+    },
+    "Atlas": {
+      "attack": -0.04126038274805828,
+      "defense": 0.09826689472089761,
+      "matches": 141
+    },
+    "Atlético de San Luis": {
+      "attack": -0.012394323051088672,
+      "defense": 0.09305029316065332,
+      "matches": 146
+    },
+    "Cruz Azul": {
+      "attack": 0.26230112592853844,
+      "defense": -0.17309370568538127,
+      "matches": 159
+    },
+    "Guadalajara": {
+      "attack": 0.106457246544626,
+      "defense": -0.2628838651688343,
+      "matches": 153
+    },
+    "Juárez": {
+      "attack": -0.13704840769764756,
+      "defense": 0.23700584710517478,
+      "matches": 139
+    },
+    "León": {
+      "attack": -0.07315970280967926,
+      "defense": 0.06455539949491591,
+      "matches": 141
+    },
+    "Mazatlán": {
+      "attack": -0.1921504770706803,
+      "defense": 0.21317217204813166,
+      "matches": 120
+    },
+    "Monterrey": {
+      "attack": 0.18863773329710656,
+      "defense": -0.02633958995575315,
+      "matches": 157
+    },
+    "Necaxa": {
+      "attack": -0.07885174278150975,
+      "defense": 0.1647109341089824,
+      "matches": 138
+    },
+    "Pachuca": {
+      "attack": 0.047469916508140544,
+      "defense": -0.13540886836985747,
+      "matches": 148
+    },
+    "Puebla": {
+      "attack": -0.28170794657780596,
+      "defense": 0.19131081033414365,
+      "matches": 137
+    },
+    "Pumas UNAM": {
+      "attack": 0.08667454881678267,
+      "defense": -0.0507598176831082,
+      "matches": 152
+    },
+    "Querétaro": {
+      "attack": -0.22350366944781339,
+      "defense": 0.013392390755595625,
+      "matches": 134
+    },
+    "Santos Laguna": {
+      "attack": -0.13073191970989118,
+      "defense": 0.1915949220991433,
+      "matches": 139
+    },
+    "Tigres UANL": {
+      "attack": 0.043355222217199695,
+      "defense": -0.2222241012911498,
+      "matches": 162
+    },
+    "Tijuana": {
+      "attack": 0.07637367615118094,
+      "defense": 0.0052297503873157975,
+      "matches": 141
+    },
+    "Toluca": {
+      "attack": 0.3080294309877789,
+      "defense": -0.17629674065971046,
+      "matches": 153
+    }
+  },
+  "intercept": 0.19460934645847067,
+  "advantage": 0.25556014045139447,
+  "rho": -0.06765828066954283
+}
