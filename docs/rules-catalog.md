@@ -32,6 +32,7 @@ Caps are in log-odds. No rule may exceed 0.4; the total per outcome is capped at
 | R28 | Donation rate | 1 | Favorite is transition-leaky (concedes on counters) | Underdog goal +, both-teams-to-score + | 0.30 | Egypt and Cape Verde vs. Argentina |
 | R30 | Dead-rubber motivation | 2 | Third-place or dead game | Team with fresh reserves + over team with tired starters | 0.25 | Bronze game lesson |
 | R31 | Altitude and travel | 2 | Home team at high altitude, visitor without recent altitude exposure | Home + | 0.20 | Liga MX: Toluca, Pachuca, Mexico City |
+| R32 | First-leg incentives | 2 | First leg of a two-legged tie where the away team holds the aggregate tiebreak | Away win −, draw +. Never reduces the home win | 0.20 | Monterrey 0-0 América (right); fading home favorite Toluca was wrong, Toluca 2-0 Atlas |
 
 ## Method rules (decided in 90 vs. extra time/penalties)
 
@@ -54,6 +55,8 @@ Base rate: 77% of 2026 World Cup knockout games were decided in 90 minutes (24 o
 | R24a | Override the user's contrarian pick | Override record was about 50/50, zero net value |
 | R-v9 | "Elite scorers on both sides means no extra time" | Broken twice in one day (England-Norway, Argentina-Switzerland) |
 | R-mkt | Market slice beats profile at the extremes | Egypt-Australia and Switzerland-Colombia went to penalties |
+| R-inj | Discount an elite player for a known injury he already played through | Alcaraz beat Zverev 6-2, 7-6 two days after winning on the same strapped thigh |
+| R-tbl | Near-equal table points mean near-equal teams | Atlas (4th) vs. Toluca (5th): Toluca won 2-0; venue and head-to-head carried more signal than 17 games of points |
 
 ## Process rules (not adjustments)
 
@@ -62,3 +65,5 @@ Base rate: 77% of 2026 World Cup knockout games were decided in 90 minutes (24 o
 - **P3. Lineup beats news.** Confirmed XI supersedes all availability flags.
 - **P4. Log the user's pick.** When the user picks against the system, record it as its own predictor so the ledger can measure the user's edge too.
 - **P5. No bet is normal.** Most markets are fair.
+- **P6. Public news is priced.** News published before the market's last big move is already in a liquid price. Rules may adjust only on information newer than that (confirmed lineups, in-play events) or in thin markets.
+- **P7. Rule-only edges pay a premium.** When the edge comes only from rule adjustments, with no model baseline behind it, require at least 5¢ after fees and half the normal stake until 50 such predictions have settled.
