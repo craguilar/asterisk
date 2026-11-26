@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { capRules, combine, normalize } from './math.js';
-import { ruleRegistry } from './rules.js';
+import { marketDeviationScale, ruleRegistry, type RuleFire } from './rules.js';
 import type { EngineCard, CardMarket } from './pipeline.js';
 
 export interface TrainingExample {
@@ -11,7 +11,7 @@ export interface WeightVersion {
   version:string; weights:Record<string,number>; trainedThrough:string; sampleCount:number; eligibleTickers:string[];
 }
 interface Label {
-  row:CardMarket; day:string; version:string; y:number; settledAt:string; prior:number; model:number; marketWeight:number; features:Map<string,number>;
+  row:CardMarket; day:string; version:string; y:number; settledAt:string; prior:number; model:number; baseWeight:number; issuedWeight:number; features:Map<string,number>;
 }
 const registry=new Map(ruleRegistry.map(r=>[r.id,r]));
 const logit=(p:number)=>Math.log(p/(1-p));
@@ -21,18 +21,18 @@ function labelledGroups(examples:TrainingExample[]) {
     if (card.mode!=='live' || card.simulation || !Number.isFinite(Date.parse(card.asOf))) continue;
     const grouped=new Map<string,Label[]>();
     for (const row of card.markets) {
-      const o=outcomes[row.ticker], weight=card.marketWeight;
+      const o=outcomes[row.ticker], weight=row.effectiveMarketWeight??card.marketWeight;
       if (!o || ![0,1].includes(o.outcome) || !(Date.parse(o.settledAt)>Date.parse(card.asOf)) ||
           row.kickoff===null || !(Date.parse(card.asOf)<Date.parse(row.kickoff)) || !row.outcome ||
           row.prior===null || row.model===null || !(row.prior>0 && row.prior<1 && row.model>0 && row.model<1) ||
-          !(weight>=0 && weight<=1) || row.probability===null || seen.has(row.ticker)) continue;
+          !(card.marketWeight>=0 && card.marketWeight<=1 && weight>=0 && weight<=1) || row.probability===null || seen.has(row.ticker)) continue;
       const features=new Map<string,number>();
       for (const rule of row.rules) {
         const entry=registry.get(rule.id);
         if (!entry || entry.tier===3 || rule.target!==row.outcome || !rule.feature || !Number.isFinite(rule.feature)) continue;
         features.set(rule.id,(features.get(rule.id)??0)+Math.max(-entry.cap,Math.min(entry.cap,rule.feature)));
       }
-      const label={row,day:card.asOf.slice(0,10),version:card.weightVersion??'unversioned',y:o.outcome,settledAt:o.settledAt,prior:row.prior,model:row.model,marketWeight:weight,features};
+      const label={row,day:card.asOf.slice(0,10),version:card.weightVersion??'unversioned',y:o.outcome,settledAt:o.settledAt,prior:row.prior,model:row.model,baseWeight:card.marketWeight,issuedWeight:weight,features};
       const group=grouped.get(row.event)??[]; group.push(label); grouped.set(row.event,group);
     }
     for (const group of grouped.values()) {
@@ -44,7 +44,10 @@ function labelledGroups(examples:TrainingExample[]) {
   }
   return groups;
 }
-function shrink(row:CardMarket) {return row.rules.some(r=>r.id==='R27') ? .5 : 1;}
+function ruleScale(row:CardMarket,fires:RuleFire[]) {
+  // Legacy cards damped only rule adjustments, with a fixed factor whenever R27 fired.
+  return row.effectiveMarketWeight===undefined ? (fires.some(f=>f.id==='R27') ? .5 : 1) : marketDeviationScale(fires);
+}
 export function learnWeights(examples:TrainingExample[], previous?:WeightVersion|null):WeightVersion|null {
   const rows=labelledGroups(examples).flat(), before=new Set(previous?.eligibleTickers??[]);
   const added=rows.filter(r=>!before.has(r.row.ticker));
@@ -57,8 +60,8 @@ export function learnWeights(examples:TrainingExample[], previous?:WeightVersion
   for (const id of ids) weights[id]??=registry.get(id)!.weight;
   // Fixed market/model logit is an offset. Fit only catalog coefficients, using
   // proximal gradient descent for the mean binomial deviance plus L1 penalty.
-  const data=rows.map(r=>({offset:r.marketWeight*logit(r.prior)+(1-r.marketWeight)*logit(r.model),
-    terms:[...r.features].map(([id,value])=>({id,x:value*shrink(r.row)})),y:r.y}));
+  const data=rows.map(r=>({offset:r.issuedWeight*logit(r.prior)+(1-r.issuedWeight)*logit(r.model),
+    terms:[...r.features].map(([id,value])=>({id,x:value*ruleScale(r.row,r.row.rules)})),y:r.y}));
   const maxNorm=Math.max(1,...data.map(r=>r.terms.reduce((s,t)=>s+t.x*t.x,0)));
   const step=3/maxNorm, penalty=.002;
   for (let n=0;n<400;n++) {
@@ -86,14 +89,16 @@ function withoutRule(group:Label[],omit:string) {
   // Removing a fire changes the unnormalised probability on the affected side.
   // Apply that ratio to the distribution actually published, then renormalize
   // the three outcomes. Every coefficient and adjustment came from this run.
-  return normalize(group.map(({row,prior,model,marketWeight})=>{
+  return normalize(group.map(({row,prior,model,baseWeight,issuedWeight})=>{
     const remaining=row.rules.filter(rule=>rule.id!==omit);
     const targetAdjustments=remaining.filter(rule=>rule.target===row.outcome).map(rule=>rule.applied);
-    const reduced=capRules(targetAdjustments)*(remaining.some(rule=>rule.id==='R27')?.5:1);
+    const reducedScale=ruleScale(row,remaining);
+    const reduced=capRules(targetAdjustments)*reducedScale;
+    const counterfactualWeight=row.effectiveMarketWeight===undefined ? baseWeight : 1-(1-baseWeight)*reducedScale;
     const originalTotal=Number.isFinite(row.ruleAdjustment)?row.ruleAdjustment:
-      capRules(row.rules.filter(rule=>rule.target===row.outcome).map(rule=>rule.applied))*shrink(row);
-    const before=combine(prior,model,marketWeight,originalTotal);
-    const after=combine(prior,model,marketWeight,reduced);
+      capRules(row.rules.filter(rule=>rule.target===row.outcome).map(rule=>rule.applied))*ruleScale(row,row.rules);
+    const before=combine(prior,model,issuedWeight,originalTotal);
+    const after=combine(prior,model,counterfactualWeight,reduced);
     return row.probability!*after/before;
   }));
 }

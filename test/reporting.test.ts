@@ -48,7 +48,7 @@ describe('performance ledger',()=>{
 it('uses a recorded settlement for each snapshot of the same contract and applies the prediction date window',async()=>{
   const db=new PGlite();
   try {
-    await db.exec(await readFile(new URL('../migrations/001.sql',import.meta.url),'utf8'));
+    for(const migration of ['001.sql','004-closing.sql']) await db.exec(await readFile(new URL('../migrations/'+migration,import.meta.url),'utf8'));
     const sql:Sql={rows:async<T extends Row>(query:string,params:unknown[]=[]) => (await db.query<T>(query,params)).rows};
     const early=randomUUID(),later=randomUUID();
     for(const [id,day,p,stake] of [[early,'2026-05-01',.4,0],[later,'2026-05-02',.7,1]] as const){

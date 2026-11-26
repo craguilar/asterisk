@@ -14,7 +14,7 @@ function transport(prices:(number|null)[],status='finalized',resultOverride?:str
         {end_period_ts:end-60,yes_ask:{close_dollars:prices[i]?.toString()??null}},
         {end_period_ts:end+60,yes_ask:{close_dollars:'0.99'}}]});
     }
-    return Response.json({market:{ticker:m.ticker,event_ticker:event,status,result:resultOverride??(i===0?'yes':'no'),
+    return Response.json({market:{ticker:m.ticker,event_ticker:event,status,market_type:'binary',rules_primary:'90 minutes plus stoppage time.',result:resultOverride??(i===0?'yes':'no'),
       settlement_ts:'2026-11-08T01:12:00Z',settlement_value_dollars:i===0?'1.0000':'0.0000'}});
   };
 }
@@ -29,6 +29,16 @@ describe('official settlements',()=>{
   it('deduplicates tickers and normalizes the last complete set of pre-kickoff asks',async()=>{
     const rows=await readFinals([...markets,markets[0]!],transport([.52,.27,.26]));
     expect(rows.map(r=>r.outcome)).toEqual([1,0,0]);expect(rows[0]!.closingPrior).toBeCloseTo(.52/1.05);
+    expect(rows[0]!.closingEvidence).toMatchObject({endPeriodTs:end-60,quotes:markets.map((q,i)=>({ticker:q.ticker,ask:[.52,.27,.26][i],source:expect.stringContaining(q.ticker+'/candlesticks?')}))});
+  });
+  it.each([{market_type:'scalar'},{rules_primary:'Winner after 90 minutes including extra time.'},{settlement_value_dollars:undefined}])('requires matching payout and regulation contract evidence',async change=>{
+    const original=transport([.5,.3,.2]);
+    const rows=await readFinals(markets,async(input,init)=>{
+      const response=await original(input,init);
+      if (!String(input).endsWith('-TOL')) return response;
+      const body=await response.json();Object.assign(body.market,change);return Response.json(body);
+    });
+    expect(rows).toEqual([]);
   });
   it('leaves CLV missing for an incomplete candle set but retains official results',async()=>{
     expect((await readFinals(markets,transport([null,.2,.3]))).every(r=>r.closingPrior===null)).toBe(true);

@@ -12,7 +12,7 @@ export async function settlePending(db:Database, read:typeof readFinals=readFina
     FROM predictions p JOIN runs r ON r.id=p.run_id
     LEFT JOIN settlements s ON s.run_id=p.run_id AND s.ticker=p.ticker
     LEFT JOIN settlement_checks c ON c.run_id=p.run_id AND c.event=p.observation->>'event'
-    WHERE r.mode='live' AND s.ticker IS NULL AND p.observation->>'event' IS NOT NULL
+    WHERE r.mode='live' AND (s.ticker IS NULL OR c.run_id IS NOT NULL) AND p.observation->>'event' IS NOT NULL
       AND (p.observation->>'kickoff')::timestamptz<now()
       AND (c.next_check_at IS NULL OR c.next_check_at<=now())
     GROUP BY p.run_id, p.observation->>'event', c.next_check_at, r.run_day
@@ -35,7 +35,8 @@ export async function settlePending(db:Database, read:typeof readFinals=readFina
       const finals=await read(group);
       const ids=new Set(finals.map(f=>f.ticker));
       const complete=group.length===3 && finals.length===3 && ids.size===3 && group.every(m=>ids.has(m.ticker));
-      if (complete && !finals.some(f=>f.closingNote==='price_history_unavailable')) {
+      if (complete) {
+        const retryClosing=finals.some(f=>f.closingNote==='price_history_unavailable');
         added+=await db.transaction(async tx=>{
           const held=await tx.rows('SELECT lease FROM settlement_checks WHERE run_id=$1 AND event=$2 AND lease=$3 FOR UPDATE',params);
           if (!held.length) return 0;
@@ -43,15 +44,22 @@ export async function settlePending(db:Database, read:typeof readFinals=readFina
           for (const f of finals) {
             const result=await tx.rows(`INSERT INTO settlements(run_id,ticker,outcome,close_prior,source,settled_at)
               VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING RETURNING ticker`,
-              [run_id,f.ticker,f.outcome,f.closingPrior,f.source,f.settledAt]);
+              [run_id,f.ticker,f.outcome,null,f.source,f.settledAt]);
             inserted+=result.length;
+            if(f.closingPrior!==null && f.closingEvidence) {
+              await tx.rows(`INSERT INTO closing_observations(run_id,ticker,close_prior,candle_end_at,quotes)
+                VALUES($1,$2,$3,to_timestamp($4),$5::jsonb) ON CONFLICT DO NOTHING`,
+                [run_id,f.ticker,f.closingPrior,f.closingEvidence.endPeriodTs,JSON.stringify(f.closingEvidence.quotes)]);
+            }
           }
-          await tx.rows('DELETE FROM settlement_checks WHERE run_id=$1 AND event=$2 AND lease=$3',params);
+          if (retryClosing) await tx.rows(`UPDATE settlement_checks SET reason='price_history_unavailable',
+            next_check_at=now()+LEAST(interval '1 day',interval '15 minutes'*power(2,LEAST(attempts-1,7)))
+            WHERE run_id=$1 AND event=$2 AND lease=$3`,params);
+          else await tx.rows('DELETE FROM settlement_checks WHERE run_id=$1 AND event=$2 AND lease=$3',params);
           return inserted;
         });
         continue;
       }
-      if (complete) reason='price_history_unavailable';
     } catch {
       reason='settlement_read_failed';
     }

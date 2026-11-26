@@ -1,7 +1,11 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
 services:
   - type: web
     name: asterisk-analyst
     runtime: node
+    plan: 0.5c-512mb
+    region: oregon
+    autoDeployTrigger: checksPass
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /health
@@ -17,9 +21,12 @@ services:
   - type: cron
     name: asterisk-matchday
     runtime: node
-    schedule: "15 14 * * *"
+    plan: 0.5c-512mb
+    region: oregon
+    autoDeployTrigger: checksPass
+    schedule: "*/15 * * * *"
     buildCommand: npm ci --include=dev && npm run build
-    startCommand: npm run daily
+    startCommand: npm run daily -- --refresh
     envVars:
       - key: NODE_VERSION
         value: 24.14.1
@@ -29,6 +36,10 @@ services:
           property: connectionString
 databases:
   - name: asterisk-ledger
+    region: oregon
+    plan: 0.1c-256mb
+    diskSizeGB: 1
+    postgresMajorVersion: "18"
     databaseName: asterisk
     user: asterisk
     ipAllowList: []

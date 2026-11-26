@@ -14,6 +14,7 @@
     "start": "node dist/main.js serve",
     "demo": "node dist/main.js demo",
     "daily": "node dist/main.js daily",
+    "bundle": "node scripts/bundle.mjs",
     "migrate": "node dist/main.js migrate",
     "consult": "node dist/main.js consult",
     "backtest": "node dist/backtest.js"
@@ -22,6 +23,7 @@
     "@electric-sql/pglite": "^0.3.14",
     "fastify": "^5.6.0",
     "pg": "^8.16.0",
+    "saxes": "6.0.0",
     "tldts": "^7.5.5",
     "zod": "^4.1.0"
   },

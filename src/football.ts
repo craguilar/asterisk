@@ -1,3 +1,4 @@
+import { readScouting,applyScouting,matchScouting,citedMatchEvidence } from './scouting.js';
 import { matchDetail } from './football-details.js';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -40,6 +41,11 @@ export interface Result {
   stage: string;
   home: string;
   away: string;
+  source?: string;
+  kickoff?: string;
+  extraTimeScore?: string|null;
+  shootoutScore?: string|null;
+  distortedWin?: 'home'|'away';
   hg: number;
   ag: number;
 }
@@ -56,16 +62,21 @@ export interface Ratings {
 
 export function history(): Result[] {
   return readFileSync(ARCHIVE, 'utf8').trim().split(/\r?\n/).slice(1).map(line => {
-    const [date, season, stage, h, a, hg, ag] = line.split(',');
+    const [date, season, stage, h, a, hg, ag, extraTime, penalties] = line.split(',');
     // Conservative availability for calendar-day records lacking kickoff and timezone.
     return { date, availableAt: Date.parse(date + 'T00:00:00Z') + 2 * DAY, season, stage,
-      home: teamName(h), away: teamName(a), hg: Number(hg), ag: Number(ag) };
+      source:'OpenFootball CC0', extraTimeScore:extraTime||null, shootoutScore:penalties||null, home: teamName(h), away: teamName(a), hg: Number(hg), ag: Number(ag) };
   });
 }
 
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(x, hi));
 const rate = (eta: number) => Math.exp(clamp(eta, Math.log(0.15), Math.log(4.4)));
 
+export function formWeight(g:Result) {
+  // R01 applies only to a specific, verified distorted win of at least three goals.
+  const margin=g.hg-g.ag;
+  return (g.distortedWin==='home' && margin>=3) || (g.distortedWin==='away' && margin<=-3) ? 0.5 : 1;
+}
 export function fit(results: Result[], asOf: string): Ratings {
   const time = Date.parse(asOf);
   if (!Number.isFinite(time)) throw Error('Invalid model cutoff');
@@ -80,7 +91,7 @@ export function fit(results: Result[], asOf: string): Ratings {
   const observations = eligible.map(g => {
     const h = index.get(g.home)!;
     const a = index.get(g.away)!;
-    const w = Math.exp(-Math.LN2 * (time - g.availableAt) / (365 * DAY));
+    const w = formWeight(g) * Math.exp(-Math.LN2 * (time - g.availableAt) / (365 * DAY));
     played[h]++; played[a]++; volume[h] += w; volume[a] += w;
     return { h, a, w, x: g.hg, y: g.ag };
   });
@@ -168,7 +179,7 @@ export function espnResults(events: FootballEvent[]): Result[] {
     const hg=score(teams.h), ag=score(teams.a);
     if (!Number.isInteger(hg) || hg < 0 || !Number.isInteger(ag) || ag < 0) continue;
     games.push({date: e.date.slice(0,10), availableAt: Date.parse(e.date) + DAY, season: e.date.slice(0,4), stage: 'ESPN regulation',
-      home: teams.home, away: teams.away, hg, ag});
+      source:ESPN+'?dates='+e.date.slice(0,4)+'&limit=1000',kickoff:e.date,home: teams.home, away: teams.away, hg, ag});
   }
   return games;
 }
@@ -200,14 +211,18 @@ export async function footballContext(asOf: string, mode: 'live' | 'demo', fetch
       ? JSON.parse(readFileSync(new URL('../data/replay-ratings.json', import.meta.url), 'utf8'))
       : fit(base, asOf);
     const kickoff = replay ? FIXTURE_UTC : new Date(+at + 3*3600_000).toISOString();
-    return {source: replay ? 'ESPN fixture 401876905; pre-match fitted ratings from OpenFootball and ESPN' : 'Simulated schedule; OpenFootball historical ratings',
+    return {ratings:model,results:base.filter(g=>g.availableAt<+at && +at-g.availableAt<=1461*DAY),
+      coverage:replay?'CC0 history subset; the frozen coefficients also used ESPN results documented in data/FOOTBALL.md':'All training observations',source: replay ? 'ESPN fixture 401876905; pre-match fitted ratings from OpenFootball and ESPN' : 'Simulated schedule; OpenFootball historical ratings',
       matches:[fixture('Toluca','Monterrey',kickoff,model)]};
   }
   const year = at.getUTCFullYear();
-  const seasons = [year-1,year];
+  const endOfArchive=base.reduce((date,g)=>g.date>date?g.date:date,'');
+  const firstSeason=Math.min(year,Math.max(year-4,Number(endOfArchive.slice(0,4))));
+  const seasons=Array.from({length:year-firstSeason+1},(_,i)=>firstSeason+i);
   if (new Date(+at + 7*DAY).getUTCFullYear() > year) seasons.push(year+1);
   const events = (await Promise.all(seasons.map(y => scoreboard(String(y), fetchImpl)))).flat();
-  const combined = extendArchive(base,events);
+  const reviewed=await readScouting(asOf);
+  const combined = applyScouting(extendArchive(base,events),reviewed);
   const model = fit(combined,asOf);
   const unique = new Map(events.map(e=>[e.id,e]));
   const allEvents = [...unique.values()];
@@ -216,7 +231,13 @@ export async function footballContext(asOf: string, mode: 'live' | 'demo', fetch
     if (!t || t.c.status?.type?.state!=='pre' || kickoff <= +at || kickoff > +at + 7*DAY) return [];
     const aliases = (c: Competitor) => [c.team.shortDisplayName,c.team.abbreviation].filter((s):s is string=>!!s);
     const match = fixture(t.home,t.away,new Date(kickoff).toISOString(),model,aliases(t.h),aliases(t.a));
-    return [matchDetail(t.home,t.away,e,allEvents,combined,model,asOf,fetchImpl).then(detail=>({...match,...detail}))];
+    return [matchDetail(t.home,t.away,e,allEvents,combined,model,asOf,fetchImpl).then(detail=>{
+      const evidence=matchScouting(reviewed,match);
+      if(!evidence)return {...match,...detail};
+      const facts={...detail.facts,...evidence,home:{...detail.facts.home,...evidence.home},away:{...detail.facts.away,...evidence.away},
+        source:detail.facts.source+' · '+evidence.source};
+      return {...match,...detail,facts,scoutingEvidence:citedMatchEvidence(reviewed,match)};
+    })];
   }));
-  return {source:'ESPN Liga MX scoreboard and OpenFootball results',matches};
+  return {ratings:model,results:combined.filter(g=>g.availableAt<+at && +at-g.availableAt<=1461*DAY),coverage:'All training observations',source:'ESPN Liga MX scoreboard and OpenFootball results',matches};
 }

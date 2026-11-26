@@ -3,6 +3,9 @@ import {randomBytes,createHash,timingSafeEqual} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {z} from 'zod';
 import {accountReaders} from './accounts.js';
+import {paperMatchday} from './matchday.js';
+import {loadRunDomain} from './domain.js';
+import {correctionHistory} from './corrections.js';
 import {consult} from './agent.js';
 import {latest,performance,reserveConsult,finishConsult,Problem,type Mode} from './store.js';
 import {loadPaperConfig,markdownCard,type EngineCard} from './pipeline.js';
@@ -67,6 +70,13 @@ export async function application(db:Database,mode:Mode,keys:Map<string,string>,
   });
   const snapshot=async()=>{const run=await latest(db,mode);if(!run)throw new Problem(503,'Awaiting first daily analysis');return {...run,card:nowCard(run.card,config.maxQuoteAgeMinutes*60000)};};
   api.get('/api/card',async()=>{const r=await snapshot();return {id:r.id,...r.card};});
+  api.get('/api/matchday',async req=>{
+    if(mode!=='live')throw new Problem(404,'Paper matchdays require live mode');
+    const {date}=z.object({date:z.iso.date()}).strict().parse(req.query);
+    return paperMatchday(db,date);
+  });
+  api.get('/api/domain',async()=>{const {id}=await snapshot();return {runId:id,domain:await loadRunDomain(db,id)};});
+  api.get('/api/corrections',async()=>correctionHistory(db,mode,(await snapshot()).id));
   api.get('/api/card.md',async(_,reply)=>reply.type('text/markdown').send(markdownCard((await snapshot()).card)));
   api.get('/api/performance',async req=>{
     const q=z.object({from:z.iso.date().optional(),to:z.iso.date().optional()}).strict().parse(req.query);

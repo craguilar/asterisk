@@ -1,16 +1,19 @@
+import type {FeedStatus} from './rss.js';
 import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
+import type {DomainInputs} from './domain.js';
 import { footballContext } from './football.js';
-import { loadMatchEvidence, type VerifiedFlag } from './news.js';
-import { readMarkets, MARKETS_URL, SERIES, type Quote } from './kalshi.js';
+import { loadNewsReport, type VerifiedFlag, type CitedRisk } from './news.js';
+import { readMarkets, MARKETS_URL, SERIES, regulationRules, type Quote } from './kalshi.js';
 import { combine, edge, kelly, normalize, scoreGrid } from './math.js';
-import { adjustment, evaluateRules, type RuleFacts, type RuleFire, type Result } from './rules.js';
+import { adjustment, evaluateRules, marketDeviationScale, secondaryEstimates, knockoutRoute, type RuleFacts, type RuleFire, type Result } from './rules.js';
 
 export type Mode = 'live' | 'demo' | 'replay';
 type MatchContext = Awaited<ReturnType<typeof import('./football-details.js').matchDetail>>['matchContext'];
 export interface Allocation {ticker:string; match:string|null; kickoff:string|null; stake:number; today:boolean}
 export interface Match {
   home:string; away:string; kickoff:string; aliasesHome:string[]; aliasesAway:string[];
+  officialLineups?:Array<{team:string;starters:string[];publishedAt:string;url:string}>;
   lambdaHome:number|null; lambdaAway:number|null; rho:number; matchContext?:MatchContext; ratingVersion?:string|null; trainedThrough?:string|null; facts?:RuleFacts; newsFlags?:VerifiedFlag[];
 }
 const configSchema = z.object({
@@ -30,20 +33,21 @@ const replaySchema = z.object({asOf:z.string().datetime(), eventTicker:z.string(
     volume:z.number().nonnegative().nullable(),rules:z.string(),source:z.string()})).length(3)});
 export interface CardMarket {
   ticker:string; title:string; label:string; event:string; match:string|null; kickoff:string|null;
-  ask:number|null; bid:number|null; last:number|null; volume:number|null; askSize:number|null; updated:string;
+  ask:number|null; bid:number|null; last:number|null; volume:number|null; askSize:number|null; updated:string; marketUpdated?:string;
   rulesText:string; marketStatus:string; source:string; outcome:Result|null; prior:number|null; model:number|null;
   probability:number|null; overround:number|null; fee:number|null; edge:number|null; stake:number; contracts:number;
   decision:'no_bet'|'paper_pick'; reason:string; rules:RuleFire[]; ruleAdjustment:number;
-  goals:{home:number;away:number;rho:number}|null; matchContext?:MatchContext; ratingVersion?:string|null; trainedThrough?:string|null; risks:string[]; cancelIf:string[]; uncertainty:string[]; newsFlags?:VerifiedFlag[];
+  effectiveMarketWeight?:number; secondary?:ReturnType<typeof secondaryEstimates>; upsetRoute?:ReturnType<typeof knockoutRoute>;
+  goals:{home:number;away:number;rho:number}|null; matchContext?:MatchContext; ratingVersion?:string|null; trainedThrough?:string|null; risks:string[]; cancelIf:string[]; uncertainty:string[]; newsFlags?:VerifiedFlag[]; unmodeledRisks?:CitedRisk[]; reviewer?:string;
 }
 export interface EngineCard {
   asOf:string; mode:Mode; source:string; footballSource:string; modelVersion:string; status:'ready'|'empty'|'unavailable'|'partial';
-  providers:{market:string;football:string;news:string}; markets:CardMarket[]; bankroll:number; dailyCap:number; exposure:number;
+  providers:{market:string;football:string;news:string}; newsFeeds?:FeedStatus[]; markets:CardMarket[]; bankroll:number; dailyCap:number; exposure:number;
   disclaimer:string; tradingEnabled:false; simulation:boolean; marketWeight:number; weightVersion:string;
 }
 const clean = (s:string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 function outcome(label:string,m:Match): Result|null {
-  const n = clean(label);
+  const n = clean(label.replace(/^reg time:\s*/i,''));
   if (n === 'tie' || n === 'draw' || n === 'empate') return 'draw';
   const h = [m.home,...m.aliasesHome].some(a => clean(a) === n);
   const a = [m.away,...m.aliasesAway].some(a => clean(a) === n);
@@ -59,14 +63,14 @@ function tradingDay(date:string) {
 }
 function blank(q:Quote, source:string):CardMarket {
   return {ticker:q.ticker,title:q.title,label:q.label,event:q.event,match:null,kickoff:null,
-    ask:q.ask,bid:q.bid,last:q.last,volume:q.volume,askSize:q.askSize,updated:q.updated,rulesText:q.rules,marketStatus:q.status,source,
+    ask:q.ask,bid:q.bid,last:q.last,volume:q.volume,askSize:q.askSize,updated:q.updated,marketUpdated:q.marketUpdated,rulesText:q.rules,marketStatus:q.status,source,
     outcome:null,prior:null,model:null,probability:null,overround:null,fee:null,edge:null,stake:0,contracts:0,
     decision:'no_bet',reason:'unlinked',rules:[],ruleAdjustment:0,goals:null,risks:[],cancelIf:[],uncertainty:[]};
 }
 function badGroup(group:Quote[], at:number, cfg:RiskConfig) {
   if (group.length !== 3 || new Set(group.map(q=>q.ticker)).size !== 3) return 'incomplete_outcomes';
   if (group.some(q=>!['open','active'].includes(q.status) || !(Date.parse(q.open) <= at && Date.parse(q.close) > at))) return 'market_closed';
-  if (group.some(q=>!/90 minutes|regulation time/i.test(q.rules))) return 'unsupported_settlement';
+  if (group.some(q=>!regulationRules(q.rules))) return 'unsupported_settlement';
   if (group.some(q=>!Number.isFinite(Date.parse(q.updated)) || Date.parse(q.updated)>at || at-Date.parse(q.updated)>cfg.maxQuoteAgeMinutes*60000)) return 'stale_quote';
   if (group.some(q=>q.ask===null || q.ask<=0 || q.ask>=1 || (q.bid!==null && q.bid>q.ask))) return 'invalid_quote';
   return null;
@@ -98,14 +102,16 @@ export function evaluateQuotes(quotes:Quote[], matches:Match[], at:Date, cfg:Ris
     }
     const favorite = priors[outcomes.indexOf('home')]! >= priors[outcomes.indexOf('away')]! ? 'home' : 'away';
     const fires = m.facts ? evaluateRules({...m.facts, favorite},weights) : [];
+    const effectiveWeight=1-(1-cfg.marketWeight)*marketDeviationScale(fires);
+    const secondary=grid && m.facts ? secondaryEstimates(grid,fires,m.facts):undefined;
     const blended = normalize(cards.map((c,i)=>{
       const prior = priors[i]!, model = grid?.[c.outcome!] ?? null;
-      c.prior=prior; c.model=model; c.overround=overround;
+      c.prior=prior; c.model=model; c.overround=overround; c.secondary=secondary; c.effectiveMarketWeight=effectiveWeight;
       c.rules=fires.filter(f=>f.target===c.outcome || f.target==='context');
       c.ruleAdjustment=adjustment(fires,c.outcome!);
       if (grid) c.goals={home:m.lambdaHome!,away:m.lambdaAway!,rho:m.rho};
       if (!m.facts) c.uncertainty.push('No verified news or lineup evidence.');
-      return combine(prior,model??prior,cfg.marketWeight,c.ruleAdjustment);
+      return combine(prior,model??prior,effectiveWeight,c.ruleAdjustment);
     }));
     for (const [i,c] of cards.entries()) {
       c.probability=blended[i]!;
@@ -134,6 +140,13 @@ export function evaluateQuotes(quotes:Quote[], matches:Match[], at:Date, cfg:Ris
     c.stake=Math.round(c.contracts*cost*1e6)/1e6;
     spent+=c.stake; matchSpend.set(c.match!+'|'+c.kickoff,(matchSpend.get(c.match!+'|'+c.kickoff)??0)+c.stake);
     c.decision='paper_pick'; c.reason='edge_after_fees';
+    const matched=matches.find(m=>m.home+' vs '+m.away===c.match && m.kickoff===c.kickoff);
+    const f=matched?.facts;
+    if(f?.knockout && c.outcome && c.outcome!=='draw' && f.underdogAdvances!==undefined && c.secondary?.extraTime) {
+      const other=rows.find(r=>r.event===c.event && r.outcome!==c.outcome && r.outcome!=='draw');
+      if(other?.prior!==null && other?.prior!==undefined && c.prior!<other.prior)
+        c.upsetRoute=knockoutRoute(f.underdogAdvances,c.probability!,c.secondary.extraTime.probability,f.home.openPlay,f.away.openPlay);
+    }
     c.risks=['The model is fitted to historical scores.', 'The quote and displayed depth can change.', 'A lineup announcement could change the estimate.'];
     c.cancelIf=['Kickoff has passed, the quote expires, or available depth falls.', 'Recomputed edge is below the configured threshold.'];
     for (const fire of c.rules.filter(r=>r.id==='R11')) c.cancelIf.push('Official lineup contradicts the recorded absence: '+fire.explanation);
@@ -149,20 +162,23 @@ function synthetic(at:Date, m:Match):Quote[] {
       open:new Date(at.valueOf()-3600000).toISOString(),close:m.kickoff,bid:ask-.02,ask,last:ask-.01,volume:1500,askSize:100};
   });
 }
-export async function buildCard(mode:Mode, at=new Date(), learned?:{version:string;weights:Record<string,number>;trainedThrough?:string}|null,previous:Allocation[]=[]):Promise<EngineCard> {
+export async function buildCard(mode:Mode, at=new Date(), learned?:{version:string;weights:Record<string,number>;trainedThrough?:string}|null,previous:Allocation[]=[],capture?:(data:DomainInputs)=>void):Promise<EngineCard> {
   const cfg = await loadPaperConfig();
   let asOf = at;
   const replay = mode==='replay' ? replaySchema.parse(JSON.parse(await readFile('data/replay.json','utf8'))) : null;
   if (replay) asOf=new Date(replay.asOf);
   const marketSource=replay?.source ?? (mode==='live'?MARKETS_URL+'?series_ticker='+cfg.series+'&status=open':'Synthetic paper-market scenario');
   let quotes:Quote[]=[], matches:Match[]=[], footballSource='Unavailable', marketStatus='ok', footballStatus='ok';
+  let fitInputs:Pick<DomainInputs,'ratings'|'results'|'coverage'>={ratings:null,results:[],coverage:'Football provider unavailable'};
   if (mode==='live') {
     try { quotes=await readMarkets(cfg.series); }
     catch { marketStatus='unavailable'; }
+    if (quotes.length) asOf=new Date();
   }
   try {
     const football=await footballContext(asOf.toISOString(),mode==='live'?'live':'demo');
     matches=football.matches; footballSource=football.source;
+    fitInputs={ratings:football.ratings,results:football.results,coverage:football.coverage};
   } catch { footballStatus='unavailable'; }
   if (replay) {
     const fit = matches.find(m=>clean(m.home)===clean(replay.match.home) && clean(m.away)===clean(replay.match.away));
@@ -178,25 +194,29 @@ export async function buildCard(mode:Mode, at=new Date(), learned?:{version:stri
     quotes=synthetic(asOf,m); matches=[m];
   }
   let newsStatus = mode==='demo'?'synthetic scenario':'unconfigured';
-  if (mode==='live' && process.env.ASTERISK_NEWS_FILE) {
+  let newsFeeds:FeedStatus[]|undefined;
+  const hasCurrentLineup=matches.some(m=>m.matchContext?.currentLineups?.teams.some(l=>l.status==='confirmed'));
+  if (mode==='live' && (process.env.ASTERISK_NEWS_FILE||process.env.ASTERISK_NEWS_FEEDS||hasCurrentLineup)) {
     try {
-      const evidence=await loadMatchEvidence(asOf.toISOString(),matches);
-      newsStatus=evidence.length?'verified evidence':'no qualifying evidence';
+      const report=await loadNewsReport(asOf.toISOString(),matches); const evidence=report.evidence; newsFeeds=report.feeds;
+      newsStatus=report.status;
       matches=matches.map(m=>{
         const report=evidence.find(r=>r.home===m.home && r.away===m.away && r.kickoff===m.kickoff);
         if (!report) return m;
-        return {...m,newsFlags:report.flags,facts:{...m.facts,home:{...m.facts?.home,...report.homeFacts},
+        return {...m,newsFlags:report.flags,officialLineups:report.officialLineups,facts:{...m.facts,home:{...m.facts?.home,...report.homeFacts},
           away:{...m.facts?.away,...report.awayFacts},source:[m.facts?.source,report.source].filter(Boolean).join(' · '),favorite:'home' as const}};
       });
     } catch { newsStatus='unavailable'; }
   }
+  if(mode==='live' && quotes.length) asOf=new Date();
   const eligibleWeights=mode==='live' && (!learned?.trainedThrough || Date.parse(learned.trainedThrough)<asOf.valueOf()) ? learned : null;
   const markets=evaluateQuotes(quotes,matches,asOf,cfg,marketSource,eligibleWeights?.weights,previous);
   if (replay) for (const c of markets) c.source=replay.markets.find(q=>q.ticker===c.ticker)!.source;
+  capture?.({...fitInputs,matches});
   const partial=footballStatus!=='ok' || markets.some(c=>c.probability===null || c.model===null);
   return {asOf:asOf.toISOString(),mode,source:marketSource,footballSource,modelVersion:'dc-logodds-v1',
     status:marketStatus!=='ok'?'unavailable':!markets.length?'empty':partial?'partial':'ready',
-    providers:{market:marketStatus,football:footballStatus,news:newsStatus},
+    newsFeeds,providers:{market:marketStatus,football:footballStatus,news:newsStatus},
     markets,marketWeight:cfg.marketWeight,weightVersion:eligibleWeights?.version??'catalog-v1',bankroll:cfg.bankroll,dailyCap:cfg.dailyCap,exposure:markets.reduce((s,c)=>s+c.stake,previous.reduce((s,p)=>s+(p.today?p.stake:0),0)),tradingEnabled:false,
     simulation:mode==='demo',disclaimer:'Paper analysis only. This is not financial advice.'};
 }
@@ -211,7 +231,10 @@ export function markdownCard(card:EngineCard) {
       c.kickoff?new Date(c.kickoff).toLocaleString('en-US',{timeZone:'America/Mexico_City'})+' Mexico City · '+new Date(c.kickoff).toLocaleString('en-US',{timeZone:'America/Chicago'})+' Chicago':'Unlinked fixture',
       '', 'Ask '+pct(c.ask)+' · Prior '+pct(c.prior)+' · Model '+pct(c.model)+' · Combined '+pct(c.probability)+' · Net edge '+pct(c.edge),
       '',c.decision+' · '+c.reason+' · Paper cost $'+c.stake.toFixed(2),'',...c.rules.map(f=>text(f.id+' '+f.explanation+' ['+f.source+']')),
-      ...c.uncertainty.map(text),...c.risks.map(r=>'Risk: '+text(r)),...c.cancelIf.map(r=>'Cancel if: '+text(r)),'Source: '+text(c.source),'');
+      ...c.uncertainty.map(text),...c.risks.filter(r=>!c.unmodeledRisks?.some(cited=>r.endsWith(cited.url))).map(r=>'Risk: '+text(r)),...c.cancelIf.map(r=>'Cancel if: '+text(r)),'Source: '+text(c.source),'');
+    if(c.decision==='paper_pick'){
+      lines.push('### Unmodeled risks','',...(c.unmodeledRisks?.length?c.unmodeledRisks.map(r=>text(r.text)+' · '+text(r.url)):['No additional sourced risks were identified.']),'');
+    }
   }
   lines.push('Paper bankroll $'+card.bankroll.toFixed(2)+' · Exposure $'+card.exposure.toFixed(2)+' / $'+card.dailyCap.toFixed(2),card.disclaimer);
   return lines.join('\n');

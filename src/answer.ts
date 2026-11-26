@@ -14,7 +14,15 @@ export function describe(tool:ToolName,data:unknown,question:string) {
   const body=record(data)?data:{};
   const context=body.mode==='replay'?'Historical replay. ':body.mode==='demo'||body.simulated===true?'Simulated run. ':'';
   const stamp=typeof body.asOf==='string'?' Snapshot taken '+body.asOf+'.':'';
-  if (tool==='get_positions') return typeof body.reason==='string'?body.reason:'Account data is unavailable.';
+  if (tool==='get_positions') {
+    if (body.status!=='ok' || !Array.isArray(body.positions) || !Array.isArray(body.recentFills)) {
+      return typeof body.reason==='string'?body.reason:'Account data is unavailable.';
+    }
+    const count=(rows:unknown[],label:string,truncated:unknown)=>String(rows.length)+(truncated?' or more':'')+' '+label+(rows.length===1 && !truncated?'':'s');
+    const holdings=body.positions.filter(record).slice(0,3).map(p=>String(p.ticker)+' ('+String(p.position_fp)+' contracts)');
+    return 'Your account returned '+count(body.positions,'position',body.positionsTruncated)+' and '+count(body.recentFills,'recent fill',body.fillsTruncated)+'.'+
+      (holdings.length?' Positions: '+holdings.join(', ')+'.':'')+stamp;
+  }
   if (tool==='get_run_status') {
     const count=typeof body.marketCount==='number'?' It contains '+body.marketCount+' markets.':'';
     const sources=record(body.providers)?Object.entries(body.providers).map(([k,v])=>k+' '+String(v)).join(', '):'';

@@ -44,3 +44,19 @@ it('isolates outages, retries staggered and missing evidence, and reads all sibl
   expect(await settlePending(db,async m=>finals(m[0]!.event))).toBe(6);
   expect(await db.rows('SELECT * FROM settlement_checks')).toHaveLength(0);
 },60000);
+it('stores scoreable finals during a candle outage, then amends only closing observations',async()=>{
+  const id=randomUUID(),event='KXLIGAMXGAME-26JAN01EEEEEE';
+  await db.rows('INSERT INTO runs(id,mode,run_day,card) VALUES($1,$2,$3,$4)',[id,'live',day,JSON.stringify({mode:'live'})]);
+  for (const ticker of tickers(event)) await db.rows('INSERT INTO predictions VALUES($1,$2,$3)',[id,ticker,JSON.stringify({event,kickoff})]);
+  const missing=finals(event).map(f=>({...f,closingPrior:null,closingNote:'price_history_unavailable'}));
+  expect(await settlePending(db,async m=>m[0]!.event===event?missing:[])).toBe(3);
+  expect(await db.rows('SELECT * FROM settlements WHERE run_id=$1 AND close_prior IS NULL',[id])).toHaveLength(3);
+  await db.rows('UPDATE settlement_checks SET next_check_at=now() WHERE run_id=$1',[id]);
+  const evidence={endPeriodTs:Date.parse(kickoff)/1000-60,quotes:tickers(event).map((ticker,i)=>({ticker,ask:[.5,.3,.2][i],source:'https://example.org/'+ticker}))};
+  expect(await settlePending(db,async m=>m[0]!.event===event?finals(event).map(f=>({...f,closingEvidence:evidence})):[])).toBe(0);
+  const saved=await db.rows('SELECT close_prior FROM effective_settlements WHERE run_id=$1 ORDER BY ticker',[id]);
+  expect(saved.map(r=>r.close_prior)).toEqual([.5,.3,.2]);
+  expect(await db.rows('SELECT * FROM settlements WHERE run_id=$1 AND close_prior IS NULL',[id])).toHaveLength(3);
+  expect(await db.rows('SELECT * FROM settlement_checks WHERE run_id=$1',[id])).toHaveLength(0);
+  await expect(db.rows('UPDATE closing_observations SET close_prior=0 WHERE run_id=$1',[id])).rejects.toThrow(/immutable/i);
+},60000);

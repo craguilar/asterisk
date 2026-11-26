@@ -1,4 +1,4 @@
-import { teamName, espnResults, type FootballEvent, type Ratings, type Result } from './football.js';
+import { teamName, espnResults, formWeight, type FootballEvent, type Ratings, type Result } from './football.js';
 
 const DAY = 86_400_000;
 const SUMMARY = 'https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/summary';
@@ -84,8 +84,11 @@ function form(team:string, results:Result[], asOf:number) {
   const recent=results.filter(g=> (g.home===team || g.away===team) && g.availableAt<asOf)
     .sort((a,b)=>b.availableAt-a.availableAt).slice(0,5);
   if(recent.length!==5)return {};
-  return {frequentDraws:recent.filter(g=>g.hg===g.ag).length>=2,
-    scoresRecently:recent.filter(g=>(g.home===team?g.hg:g.ag)>0).length>=3};
+  const total=recent.reduce((s,g)=>s+formWeight(g),0);
+  const goals=recent.reduce((s,g)=>s+formWeight(g)*(g.hg+g.ag),0);
+  return {bigWinDistorted:recent.some(g=>formWeight(g)<1 && (g.distortedWin==='home'?g.home:g.away)===team),
+    frequentDraws:recent.filter(g=>g.hg===g.ag).length>=2,lowEvent:goals/total<=2,
+    scoresRecently:recent.reduce((s,g)=>s+formWeight(g)*Number((g.home===team?g.hg:g.ag)>0),0)>total/2};
 }
 
 export async function matchDetail(home:string,away:string,e:FootballEvent,events:FootballEvent[],results:Result[],

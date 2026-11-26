@@ -72,7 +72,7 @@ export async function performance(sql:Sql,mode:Mode,from?:string,to?:string) {
   // is known. Filtering the lower bound here would score a later forecast twice.
   const rows=await sql.rows<SettledForecast>(`WITH final AS (
     SELECT DISTINCT ON (s.ticker) s.ticker,s.outcome,s.close_prior,s.source,s.settled_at
-      FROM settlements s JOIN runs r ON r.id=s.run_id WHERE r.mode=$1
+      FROM effective_settlements s JOIN runs r ON r.id=s.run_id WHERE r.mode=$1
       ORDER BY s.ticker,(s.close_prior IS NOT NULL) DESC,s.settled_at,s.run_id)
     SELECT p.ticker,p.run_id,p.observation AS m,r.run_day::text AS day,r.card->>'asOf' AS as_of,
            s.outcome,s.close_prior,s.source,s.settled_at

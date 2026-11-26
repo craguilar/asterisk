@@ -14,6 +14,8 @@ npm run demo
 
 Open **http://127.0.0.1:4317**. A distributed runnable ZIP already contains the compiled service and production dependencies. Extract it and run `node dist/main.js demo`, or double-click `Start Asterisk.cmd` on Windows. The default demo replays actual Toluca–Monterrey market observations from **November 7, 2026 at 16:00 UTC**, nine hours before kickoff. Official outcomes are stored separately. The card explains the price, model probability, blend and no-bet reason. Open the settlement panel, ask the analyst about Toluca, or download the Markdown card. The local router needs no internet or API key. The demo keeps its embedded PostgreSQL database under `.asterisk/pg`. One process owns that directory. Set `PORT` or `ASTERISK_DEMO_DIR` to run another instance.
 
+For current public markets, open `Start Live Asterisk.cmd` on Windows. The live launcher uses port 4318 and a separate local ledger. Keep it open to refresh prices and poll for official results every 15 minutes.
+
 ## Data modes
 
 | ASTERISK_MODE | Market observations | Use |
@@ -67,8 +69,12 @@ The [captured exchange comparison](data/backtest-exchange.json) covers 21 matche
 
 The market leads both samples. This comparison uses pre-kickoff prices, excludes unmatched events, and estimates no returns. The offline 2024–25 archive comparison uses a league-frequency baseline because the CC0 results file has no market quotes. The production ledger records prospectively observed paper decisions. Replays and retrospective evaluations never qualify a live trading gate.
 
+## Prospective paper matchday
+
+The November 26 [pregame capture](data/paper/2026-11-26-pregame.json) contains the six first forecasts recorded for Pachuca–Guadalajara and León–Cruz Azul. The capture preserves its original timestamps and decisions. Consult the live ledger for subsequent official outcomes using `node dist/main.js paper-day 2026-11-26` or the dashboard’s settlement panel.
+
 ## Render
 
-The [Blueprint](render.yaml) defines a Node web service, a daily cron at 14:15 UTC, and shared managed PostgreSQL. Import it from the implementation branch or merged default branch. Provide `ASTERISK_USERS` for the web service and select database and service plans in the Render preview. Hosting may incur charges. The API and cron use internal database credentials, and inbound public database connections are disabled. Expose the web service over HTTPS. After provisioning, check `/health`, run the cron once, authenticate, and inspect the run status and the card. Restore a database backup into a separate service for a recovery drill. Roll back application code to a tested build with a compatible schema. This repository includes deployment configuration; it does not contain credentials or a hosted deployment.
+The [Blueprint](render.yaml) defines a Node web service, a scheduled refresh every 15 minutes, and shared managed PostgreSQL. Import it from the implementation branch or merged default branch. Provide `ASTERISK_USERS` for the web service and select database and service plans in the Render preview. The Oregon staging estimate is about $14/month before taxes and overages. Review the [cost breakdown and deployment steps](docs/render-staging.md) before provisioning. The API and cron use internal database credentials, and inbound public database connections are disabled. Expose the web service over HTTPS. After provisioning, check `/health`, run the cron once, authenticate, and inspect the run status and the card. Restore a database backup into a separate service for a recovery drill. Roll back application code to a tested build with a compatible schema. This repository includes deployment configuration; it does not contain credentials or a hosted deployment.
 
 The [implementation plan](docs/typescript-implementation-plan.md), [release checklist](docs/launch-checklist.md) and [task ledger](openspec/changes/add-prediction-engine/tasks.md) distinguish shipped behavior from outstanding research and operational gates. All runtime code belongs to Asterisk.

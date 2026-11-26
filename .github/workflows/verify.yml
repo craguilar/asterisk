@@ -25,3 +25,12 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run backtest
+      - name: Build runnable distribution
+        run: npm run bundle -- "$RUNNER_TEMP/distribution"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Asterisk-runnable
+          path: ${{ runner.temp }}/distribution
+          include-hidden-files: true
+          retention-days: 30
+          if-no-files-found: error
